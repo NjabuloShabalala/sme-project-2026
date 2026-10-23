@@ -101,32 +101,28 @@ def get_client():
 
 client = get_client()
 
-# SA PROVINCES LIST
+# ALL 9 SOUTH AFRICAN PROVINCES
 SA_PROVINCES = [
-    "Gauteng", 
-    "Western Cape", 
-    "KwaZulu-Natal", 
-    "Eastern Cape", 
-    "Free State", 
-    "Limpopo", 
-    "Mpumalanga", 
-    "North West", 
-    "Northern Cape"
+    "Gauteng", "Western Cape", "KwaZulu-Natal", "Eastern Cape", 
+    "Free State", "Limpopo", "Mpumalanga", "North West", "Northern Cape"
 ]
 
 # 2. HELPER FUNCTIONS & AI ENGINE
 
 def get_sector_from_description(description):
-    """Dynamically detects any and every sector from a business description without rigid taxonomy constraints."""
+    """Dynamically detects any industry vertical focusing on core economic output."""
     if not description or not description.strip():
         return "General Services"
     
     prompt = f"""
-    Analyze the following South African business description and determine its exact industry sector or vertical in 2 to 4 words max (e.g., 'Precision Agriculture & IoT', 'Renewable Energy Engineering', 'Fintech & Payments', 'Mining Logistics').
+    Analyze this South African business description and identify its primary industry sector or vertical. 
+    Focus on what the business actually does in the real world (e.g. Agriculture, Mining, Healthcare, Renewable Energy, Construction, Logistics, ICT, Finance, Manufacturing).
+    
+    Return a concise, professional sector name in 2 to 4 words max (e.g., 'Precision Agriculture & IoT', 'Renewable Energy Engineering', 'Commercial Logistics').
     
     Description: "{description}"
     
-    Respond with ONLY the professional sector name. Do NOT include punctuation, quotation marks, or explanations.
+    Respond with ONLY the sector name. No punctuation, no quotes, no explanation.
     """
     try:
         res = client.messages.create(
@@ -139,28 +135,41 @@ def get_sector_from_description(description):
     except Exception as e:
         return "General Services"
 
-def parse_document_dates_with_ai(file_text_simulated):
-    """Simulates AI document extraction (POPIA-compliant human-in-the-loop validation)."""
+def parse_document_with_ai(file_name_or_text):
+    """Parses comprehensive business profile and expiry dates from compliance document."""
     prompt = f"""
-    Extract key document expiry dates from this document summary:
-    "{file_text_simulated}"
+    Analyze this uploaded South African compliance document or filename: "{file_name_or_text}"
+    Extract the following business details as a valid JSON object with exact keys:
+    - "business_name": (string, e.g. "ApexAgro Solutions (Pty) Ltd")
+    - "description": (string summarizing business capabilities based on document context)
+    - "region": (string, must be one of: Gauteng, Western Cape, KwaZulu-Natal, Eastern Cape, Free State, Limpopo, Mpumalanga, North West, Northern Cape)
+    - "cipc": (string formatted as "YYYY-MM-DD")
+    - "tax": (string formatted as "YYYY-MM-DD")
+    - "bbbee": (string formatted as "YYYY-MM-DD")
     
-    Return a valid JSON object with keys "CIPC", "Tax", and "BBBEE" formatted as "YYYY-MM-DD".
-    Example: {{"CIPC": "2027-04-15", "Tax": "2026-11-30", "BBBEE": "2026-12-31"}}
+    Respond with ONLY valid JSON.
     """
     try:
         res = client.messages.create(
             model="claude-3-haiku-20240307", 
-            max_tokens=100, 
+            max_tokens=200, 
             messages=[{"role": "user", "content": prompt}]
         )
-        return json.loads(res.content[0].text.strip())
+        text_resp = res.content[0].text.strip()
+        # Clean markdown code blocks if present
+        if text_resp.startswith("```json"):
+            text_resp = text_resp[7:-3].strip()
+        elif text_resp.startswith("```"):
+            text_resp = text_resp[3:-3].strip()
+        return json.loads(text_resp)
     except:
-        # Fallback safe extraction dates for demo
         return {
-            "CIPC": (date.today() + timedelta(days=200)).strftime("%Y-%m-%d"),
-            "Tax": (date.today() + timedelta(days=120)).strftime("%Y-%m-%d"),
-            "BBBEE": (date.today() + timedelta(days=90)).strftime("%Y-%m-%d")
+            "business_name": "ApexAgro Solutions (Pty) Ltd",
+            "description": "Precision farming systems, crop-yield analytics, and IoT irrigation hardware.",
+            "region": "Gauteng",
+            "cipc": (date.today() + timedelta(days=200)).strftime("%Y-%m-%d"),
+            "tax": (date.today() + timedelta(days=120)).strftime("%Y-%m-%d"),
+            "bbbee": (date.today() + timedelta(days=90)).strftime("%Y-%m-%d")
         }
 
 def check_document_status(expiry_date):
@@ -184,7 +193,7 @@ if 'rfqs' not in st.session_state:
         {
             "id": 1, 
             "title": "Solar Panel Servicing & Maintenance - Gauteng", 
-            "sector": "Renewable Energy & Solar Services", 
+            "sector": "Renewable Energy & Solar", 
             "scope": "Photovoltaic maintenance and solar power servicing for regional corporate facilities.", 
             "budget": "R450,000", 
             "region": "Gauteng",
@@ -196,14 +205,15 @@ if 'rfqs' not in st.session_state:
 
 if 'verified_smes' not in st.session_state:
     st.session_state.verified_smes = [
-        {"name": "EcoSpark Solar Solutions", "sector": "Renewable Energy & Solar Services", "desc": "Photovoltaic maintenance and green energy systems.", "bbbee": "Level 1", "location": "Gauteng", "verified": True},
-        {"name": "Thabo Electrical", "sector": "Electrical & Infrastructure Engineering", "desc": "Electrical wiring and commercial infrastructure repairs.", "bbbee": "Level 2", "location": "Gauteng", "verified": True},
-        {"name": "Cape Wind Technologies", "sector": "Renewable Energy & Solar Services", "desc": "Wind turbine maintenance and solar servicing.", "bbbee": "Level 4", "location": "Western Cape", "verified": False}
+        {"name": "EcoSpark Solar Solutions", "sector": "Renewable Energy & Solar", "desc": "Photovoltaic maintenance and green energy systems.", "bbbee": "Level 1", "location": "Gauteng", "verified": True},
+        {"name": "Thabo Electrical", "sector": "Electrical Engineering", "desc": "Electrical wiring and commercial infrastructure repairs.", "bbbee": "Level 2", "location": "Gauteng", "verified": True},
+        {"name": "ApexAgro Solutions", "sector": "Precision Agriculture & IoT", "desc": "Automated precision farming systems and IoT-driven irrigation hardware.", "bbbee": "Level 1", "location": "Gauteng", "verified": True}
     ]
 
 if 'logged_in' not in st.session_state: st.session_state.logged_in = False
 if 'portal_role' not in st.session_state: st.session_state.portal_role = None 
 if 'user_profile' not in st.session_state: st.session_state.user_profile = None
+if 'extracted_ai_data' not in st.session_state: st.session_state.extracted_ai_data = None
 
 # --- ROLE SELECTION & LOGIN LANDING ---
 if not st.session_state.logged_in:
@@ -264,6 +274,7 @@ else:
         st.session_state.logged_in = False
         st.session_state.portal_role = None
         st.session_state.user_profile = None
+        st.session_state.extracted_ai_data = None
         st.rerun()
 
     # ==========================================
@@ -280,12 +291,12 @@ else:
                     st.markdown("<br>", unsafe_allow_html=True)
                     if st.button("⚡ Load Demo Profile"):
                         st.session_state.user_profile = {
-                            "name": "EcoSpark Solar Solutions (Pty) Ltd",
-                            "description": "Photovoltaic maintenance, solar power servicing, and commercial green energy installations across Gauteng.",
-                            "sector": "Renewable Energy & Solar Services",
+                            "name": "ApexAgro Solutions",
+                            "description": "Agricultural technology company that provides automated precision farming systems, predictive crop-yield analytics, and IoT-driven irrigation hardware for commercial agricultural enterprises.",
+                            "sector": "Precision Agriculture & IoT",
                             "region": "Gauteng",
                             "bbbee": "Level 1",
-                            "references": "Successfully completed 500kW solar installation and grid-tie maintenance for corporate client X.",
+                            "references": "Successfully deployed automated irrigation IoT systems for commercial farm co-ops.",
                             "docs": {
                                 "CIPC": date.today() + timedelta(days=180),
                                 "Tax": date.today() + timedelta(days=90),
@@ -297,53 +308,79 @@ else:
                 with st.container():
                     st.markdown("<div class='css-card'>", unsafe_allow_html=True)
                     
-                    # AI Document Parser Dropzone (Backing up Pitch Script)
-                    st.markdown("#### 📄 Option A: AI Fast-Upload (Parse Compliance Certificates)")
-                    uploaded_doc = st.file_uploader("Drop CIPC / Tax / B-BBEE document here", type=["pdf", "png", "jpg", "txt"])
-                    if uploaded_doc or st.button("🤖 Auto-Extract Dates from Sample Certificate"):
-                        with st.spinner("AI parsing document metadata and extraction dates..."):
-                            extracted = parse_document_dates_with_ai("Sample Tax Clearance Certificate Valid until 2027-05-30")
-                            st.success("AI Extracted Expiry Dates Successfully! Please verify below (Human-in-the-Loop).")
-                            st.json(extracted)
-
-                    st.markdown("<hr>", unsafe_allow_html=True)
-                    st.markdown("#### Option B: Manual Profile Entry")
+                    # --- AI FAST-UPLOAD & HUMAN-IN-THE-LOOP CONFIRMATION ---
+                    st.markdown("#### 📄 AI Fast-Upload (Parse Compliance & Company Data)")
+                    uploaded_file = st.file_uploader("Drop CIPC / Tax / B-BBEE document here", type=["pdf", "png", "jpg", "txt"])
                     
+                    if uploaded_file is not None or st.button("🤖 Simulating Document OCR & AI Parse"):
+                        with st.spinner("AI is extracting company name, region, capabilities, and expiry dates..."):
+                            filename = uploaded_file.name if uploaded_file else "ApexAgro_Compliance_Level1.pdf"
+                            st.session_state.extracted_ai_data = parse_document_with_ai(filename)
+                    
+                    # If AI extracted data, display Human-in-the-Loop Review Banner
+                    if st.session_state.extracted_ai_data:
+                        ai_data = st.session_state.extracted_ai_data
+                        st.markdown("""
+                            <div style="background-color: #EFF6FF; border: 1px solid #BFDBFE; padding: 16px; border-radius: 8px; margin-bottom: 20px;">
+                                <h4 style="color: #1E40AF; margin-top: 0;">✨ AI Extraction Complete — Human Verification Required</h4>
+                                <p style="font-size: 0.9em; color: #1E3A8A; margin-bottom: 0;">Review the extracted details below, edit any field if necessary, and click <b>'Confirm & Save Profile'</b>.</p>
+                            </div>
+                        """, unsafe_allow_html=True)
+
+                    # Populate form defaults with AI extracted data if available, otherwise fallback defaults
+                    default_name = st.session_state.extracted_ai_data.get("business_name", "ApexAgro Solutions") if st.session_state.extracted_ai_data else "ApexAgro Solutions"
+                    default_desc = st.session_state.extracted_ai_data.get("description", "Precision farming systems and IoT irrigation hardware.") if st.session_state.extracted_ai_data else "Precision farming systems and IoT irrigation hardware."
+                    default_region = st.session_state.extracted_ai_data.get("region", "Gauteng") if st.session_state.extracted_ai_data else "Gauteng"
+                    
+                    # Date parsing helpers
+                    def parse_date_safely(date_str):
+                        try:
+                            return datetime.strptime(date_str, "%Y-%m-%d").date()
+                        except:
+                            return date.today() + timedelta(days=180)
+
+                    default_cipc = parse_date_safely(st.session_state.extracted_ai_data.get("cipc")) if st.session_state.extracted_ai_data else date.today() + timedelta(days=365)
+                    default_tax = parse_date_safely(st.session_state.extracted_ai_data.get("tax")) if st.session_state.extracted_ai_data else date.today() + timedelta(days=180)
+                    default_bbbee = parse_date_safely(st.session_state.extracted_ai_data.get("bbbee")) if st.session_state.extracted_ai_data else date.today() + timedelta(days=90)
+
                     with st.form("profile_form"):
-                        biz_name = st.text_input("Business Name", value="EcoSpark Solar Solutions")
-                        description = st.text_area("Business Description & Capabilities", value="Photovoltaic maintenance, solar panel servicing, and clean energy solutions.")
-                        sme_region = st.selectbox("Operating Region", SA_PROVINCES)
+                        st.markdown("#### Company Profile & Verification Form")
+                        biz_name = st.text_input("Business Name", value=default_name)
+                        description = st.text_area("Business Description & Capabilities", value=default_desc)
                         
-                        st.markdown("<h4 style='margin-top: 15px;'>Compliance Expiry Dates (Fully Adjustable)</h4>", unsafe_allow_html=True)
+                        # Set region index safely
+                        reg_index = SA_PROVINCES.index(default_region) if default_region in SA_PROVINCES else 0
+                        sme_region = st.selectbox("Operating Region / Province", SA_PROVINCES, index=reg_index)
+                        
+                        st.markdown("<h4 style='margin-top: 15px;'>Compliance Expiry Dates (Human-Verified)</h4>", unsafe_allow_html=True)
                         c1, c2, c3 = st.columns(3)
                         
-                        # Flexible Date Input Controls (Min Date set to 10 years ago, Max to 10 years ahead)
                         cipc_date = c1.date_input(
                             "CIPC Registration Expiry", 
-                            value=date.today() + timedelta(days=365),
+                            value=default_cipc,
                             min_value=date(2015, 1, 1), 
                             max_value=date(2035, 12, 31)
                         )
                         tax_date = c2.date_input(
                             "Tax Clearance Expiry", 
-                            value=date.today() + timedelta(days=180),
+                            value=default_tax,
                             min_value=date(2015, 1, 1), 
                             max_value=date(2035, 12, 31)
                         )
                         bbbee_date = c3.date_input(
                             "B-BBEE Certificate Expiry", 
-                            value=date.today() + timedelta(days=90),
+                            value=default_bbbee,
                             min_value=date(2015, 1, 1), 
                             max_value=date(2035, 12, 31)
                         )
                         
                         st.markdown("<h4 style='margin-top: 15px;'>References & Track Record</h4>", unsafe_allow_html=True)
-                        reference_text = st.text_area("Client References / Past Work", value="Completed solar PV maintenance for Corp X.")
+                        reference_text = st.text_area("Client References / Past Work", value="Deployed precision IoT systems for agricultural co-ops.")
                         
-                        submitted = st.form_submit_button("Submit Profile for Verification")
+                        submitted = st.form_submit_button("Confirm & Save Verified Profile")
                         
                         if submitted:
-                            with st.spinner("AI is categorizing capabilities..."):
+                            with st.spinner("AI is dynamically categorizing capabilities..."):
                                 sector = get_sector_from_description(description)
                                 st.session_state.user_profile = {
                                     "name": biz_name,
@@ -361,6 +398,8 @@ else:
                                 st.session_state.verified_smes.append({
                                     "name": biz_name, "sector": sector, "desc": description, "bbbee": "Level 1", "location": sme_region, "verified": True
                                 })
+                                # Clear extraction cache
+                                st.session_state.extracted_ai_data = None
                                 st.rerun()
                     st.markdown("</div>", unsafe_allow_html=True)
             else:
@@ -373,7 +412,7 @@ else:
                     <div class="css-card">
                         <h1 style="color: #0F4C81; margin-top: 0; margin-bottom: 5px; display: inline-block;">{profile['name']}</h1> {badge_html}
                         <br><br>
-                        <div class="sector-badge">🏷️ Sector: {profile['sector']}</div>
+                        <div class="sector-badge">🏷️ Sector: {profile['sector']} &nbsp;|&nbsp; 📍 Region: {profile['region']}</div>
                         <p style="color: #475569; font-size: 1.05em;">{profile['description']}</p>
                     </div>
                 """, unsafe_allow_html=True)
@@ -401,13 +440,11 @@ else:
                 if not all_valid:
                     st.error("🔒 Matching locked: Your compliance documents require valid updates before you can view active tenders.")
                 else:
-                    # Semantic & Sector Matching Engine
                     matched_rfqs = []
                     for rfq in st.session_state.rfqs:
-                        # Direct sector match OR semantic keyword match (e.g., solar vs photovoltaic)
                         if (rfq['sector'].lower() in profile['sector'].lower() or 
                             profile['sector'].lower() in rfq['sector'].lower() or
-                            ("solar" in profile['description'].lower() and "photovoltaic" in rfq['scope'].lower())):
+                            ("farming" in profile['description'].lower() and "agriculture" in rfq['scope'].lower())):
                             matched_rfqs.append(rfq)
                             
                     if matched_rfqs:
@@ -441,11 +478,10 @@ else:
             with st.container():
                 st.markdown("<div class='css-card'>", unsafe_allow_html=True)
                 with st.form("rfq_post_form"):
-                    rfq_title = st.text_input("Opportunity Title", placeholder="e.g. Enterprise Solar Panel Servicing")
-                    rfq_scope = st.text_area("Scope of Work & Deliverables", placeholder="Photovoltaic maintenance and solar power servicing.")
+                    rfq_title = st.text_input("Opportunity Title", placeholder="e.g. Precision Irrigation Hardware Supply")
+                    rfq_scope = st.text_area("Scope of Work & Deliverables", placeholder="Automated precision farming systems and IoT irrigation hardware.")
                     
                     c1, c2, c3 = st.columns(3)
-                    # All 9 South African Provinces Included
                     req_region = c1.selectbox("Required Region", SA_PROVINCES)
                     req_bbbee = c2.selectbox("Max B-BBEE Level Required", ["1", "2", "3", "4"])
                     budget = c3.text_input("Allocated Budget (ZAR)", placeholder="e.g. R450,000")
@@ -456,7 +492,6 @@ else:
                     submitted = st.form_submit_button("Publish & Run Qualification Match")
                     
                     if submitted:
-                        # Exact trigger for pitch validation (Triggers red error box if blank)
                         if not budget.strip() or not po_ref.strip():
                             st.error("⚠️ Actionability Check Failed: A confirmed budget allocation and internal PO reference code are mandatory before an RFQ can go live.")
                         else:

@@ -3,94 +3,48 @@ import anthropic
 import os
 from datetime import datetime, date
 from dotenv import load_dotenv
+from sentence_transformers import SentenceTransformer, util
 
 # 1. SETUP & CONFIG
 load_dotenv()
-
-st.set_page_config(page_title="VulaFlow | Enterprise Procurement Gateway", page_icon="🇿🇦", layout="wide")
+st.set_page_config(page_title="VulaFlow | Enterprise Procurement", page_icon="🇿🇦", layout="wide")
 
 # --- MASSIVE CSS OVERHAUL FOR A MODERN SAAS LOOK ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
+    .stApp { background-color: #F8FAFC; }
+    [data-testid="stSidebar"] { background-color: #FFFFFF; border-right: 1px solid #E2E8F0; }
     
-    html, body, [class*="css"] {
-        font-family: 'Inter', sans-serif;
-    }
-    .stApp {
-        background-color: #F8FAFC;
-    }
-    [data-testid="stSidebar"] {
-        background-color: #FFFFFF;
-        border-right: 1px solid #E2E8F0;
-    }
     .stButton>button {
-        background-color: #0F4C81;
-        color: white;
-        border-radius: 8px;
-        height: 2.8em;
-        width: 100%;
-        font-weight: 600;
-        border: none;
-        transition: background-color 0.2s;
+        background-color: #0F4C81; color: white; border-radius: 8px;
+        height: 2.8em; width: 100%; font-weight: 600; border: none; transition: background-color 0.2s;
     }
-    .stButton>button:hover {
-        background-color: #0A365C;
-        color: white;
-    }
+    .stButton>button:hover { background-color: #0A365C; color: white; }
     
-    /* Sleek SaaS Cards */
     .css-card {
-        background-color: #FFFFFF;
-        padding: 24px;
-        border-radius: 12px;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-        border: 1px solid #E2E8F0;
-        margin-bottom: 20px;
+        background-color: #FFFFFF; padding: 24px; border-radius: 12px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); border: 1px solid #E2E8F0; margin-bottom: 20px;
     }
     
-    /* Upgraded Vibrant Verification Badges */
     .badge-verified { 
-        background: linear-gradient(135deg, #059669 0%, #10B981 100%);
-        color: white; 
-        padding: 6px 16px; 
-        border-radius: 30px; 
-        font-size: 0.8em; 
-        font-weight: 700; 
-        margin-left: 10px;
-        box-shadow: 0 4px 6px rgba(16, 185, 129, 0.3);
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        vertical-align: middle;
+        background: linear-gradient(135deg, #059669 0%, #10B981 100%); color: white; 
+        padding: 6px 16px; border-radius: 30px; font-size: 0.8em; font-weight: 700; 
+        margin-left: 10px; box-shadow: 0 4px 6px rgba(16, 185, 129, 0.3);
+        display: inline-flex; align-items: center; gap: 6px; vertical-align: middle;
     }
     .badge-unverified { 
-        background: linear-gradient(135deg, #DC2626 0%, #EF4444 100%);
-        color: white; 
-        padding: 6px 16px; 
-        border-radius: 30px; 
-        font-size: 0.8em; 
-        font-weight: 700; 
-        margin-left: 10px;
-        box-shadow: 0 4px 6px rgba(239, 68, 68, 0.3);
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        vertical-align: middle;
+        background: linear-gradient(135deg, #DC2626 0%, #EF4444 100%); color: white; 
+        padding: 6px 16px; border-radius: 30px; font-size: 0.8em; font-weight: 700; 
+        margin-left: 10px; box-shadow: 0 4px 6px rgba(239, 68, 68, 0.3);
+        display: inline-flex; align-items: center; gap: 6px; vertical-align: middle;
     }
     .sector-badge { 
-        background-color: #EFF6FF; 
-        color: #1D4ED8; 
-        padding: 6px 14px; 
-        border-radius: 20px; 
-        font-size: 0.85em; 
-        font-weight: 600; 
-        display: inline-block; 
-        border: 1px solid #BFDBFE; 
-        margin-bottom: 12px; 
+        background-color: #EFF6FF; color: #1D4ED8; padding: 6px 14px; border-radius: 20px; 
+        font-size: 0.85em; font-weight: 600; display: inline-block; border: 1px solid #BFDBFE; margin-bottom: 12px; 
     }
     
-    /* Doc Status Boxes */
     .doc-valid { background: #F0FDF4; border-left: 4px solid #22C55E; padding: 16px; border-radius: 8px; margin-bottom: 12px; color: #166534; }
     .doc-warning { background: #FFFBEB; border-left: 4px solid #F59E0B; padding: 16px; border-radius: 8px; margin-bottom: 12px; color: #92400E; }
     .doc-error { background: #FEF2F2; border-left: 4px solid #EF4444; padding: 16px; border-radius: 8px; margin-bottom: 12px; color: #991B1B; }
@@ -99,17 +53,20 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Initialize Client
+# Initialize AI Clients
 @st.cache_resource
 def get_client():
     return anthropic.Anthropic()
-
 client = get_client()
+
+@st.cache_resource
+def load_model():
+    return SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
+model = load_model()
 
 # HELPER FUNCTIONS
 def get_sector_from_description(description):
-    if not description.strip():
-        return "General Services"
+    if not description.strip(): return "General Services"
     prompt = f"Categorize this business into ONE short sector (e.g., 'Marketing', 'Manufacturing', 'Renewable Energy', 'ICT'). Return ONLY the sector name. Description: {description}"
     try:
         res = client.messages.create(model="claude-3-haiku-20240307", max_tokens=15, messages=[{"role": "user", "content": prompt}])
@@ -129,14 +86,16 @@ def check_document_status(expiry_date):
 if 'rfqs' not in st.session_state:
     st.session_state.rfqs = [
         {
-            "id": 1, 
-            "title": "Solar Panel Servicing & Maintenance - Gauteng", 
+            "id": 1, "title": "Solar Panel Servicing & Maintenance - Gauteng", 
             "sector": "Renewable Energy", 
             "scope": "Photovoltaic maintenance and solar power servicing for regional facilities.", 
-            "budget": "R450,000", 
-            "region": "Gauteng",
-            "max_bbbee": "2",
-            "verified_only": True
+            "budget": "R450,000", "region": "Gauteng", "max_bbbee": "2", "po_ref": "PO-994821", "verified_only": True
+        },
+        {
+            "id": 2, "title": "Corporate Website Redesign", 
+            "sector": "ICT", 
+            "scope": "UX/UI design and frontend development for corporate portal.", 
+            "budget": "R200,000", "region": "Western Cape", "max_bbbee": "4", "po_ref": "PO-112233", "verified_only": False
         }
     ]
 
@@ -148,7 +107,7 @@ if 'verified_smes' not in st.session_state:
     ]
 
 if 'logged_in' not in st.session_state: st.session_state.logged_in = False
-if 'portal_role' not in st.session_state: st.session_state.portal_role = None # 'SME' or 'Corporate'
+if 'portal_role' not in st.session_state: st.session_state.portal_role = None 
 if 'user_profile' not in st.session_state: st.session_state.user_profile = None
 
 # --- ROLE SELECTION & LOGIN LANDING ---
@@ -197,7 +156,6 @@ if not st.session_state.logged_in:
 else:
     role = st.session_state.portal_role
     
-    # Sidebar Control
     st.sidebar.markdown(f"<h3 style='color: #0F4C81; margin-bottom: 0;'>VulaFlow</h3>", unsafe_allow_html=True)
     st.sidebar.caption(f"Active Role: {role} Gateway")
     st.sidebar.markdown("---")
@@ -229,10 +187,7 @@ else:
                         st.session_state.user_profile = {
                             "name": "EcoSpark Solar Solutions (Pty) Ltd",
                             "description": "Photovoltaic maintenance, solar power servicing, and commercial green energy installations across Gauteng.",
-                            "sector": "Renewable Energy",
-                            "region": "Gauteng",
-                            "bbbee": "Level 1",
-                            "references": "Successfully completed 500kW solar installation and grid-tie maintenance for corporate client X.",
+                            "sector": "Renewable Energy", "region": "Gauteng", "bbbee": "Level 1",
                             "docs": {
                                 "CIPC": date.today() + datetime.timedelta(days=180),
                                 "Tax": date.today() + datetime.timedelta(days=90),
@@ -253,28 +208,16 @@ else:
                         tax_date = c2.date_input("Tax Clearance Expiry", value=date.today())
                         bbbee_date = c3.date_input("B-BBEE Expiry", value=date.today())
                         
-                        st.markdown("<h4 style='margin-top: 15px;'>References & Track Record</h4>", unsafe_allow_html=True)
-                        reference_text = st.text_area("Client References / Past Work")
-                        
                         submitted = st.form_submit_button("Submit Profile for Verification")
                         
                         if submitted:
                             with st.spinner("AI is analyzing business capabilities..."):
                                 sector = get_sector_from_description(description)
                                 st.session_state.user_profile = {
-                                    "name": biz_name,
-                                    "description": description,
-                                    "sector": sector,
-                                    "region": "Gauteng",
-                                    "bbbee": "Level 1",
-                                    "references": reference_text,
-                                    "docs": {
-                                        "CIPC": cipc_date,
-                                        "Tax": tax_date,
-                                        "B-BBEE": bbbee_date
-                                    }
+                                    "name": biz_name, "description": description, "sector": sector, "region": "Gauteng", "bbbee": "Level 1",
+                                    "docs": {"CIPC": cipc_date, "Tax": tax_date, "B-BBEE": bbbee_date}
                                 }
-                                # Add to global verified pool for demo consistency
+                                # Add to mock DB for Corporate view
                                 st.session_state.verified_smes.append({
                                     "name": biz_name, "sector": sector, "desc": description, "bbbee": "Level 1", "location": "Gauteng", "verified": True
                                 })
@@ -306,7 +249,7 @@ else:
 
         elif menu == "Actionable Opportunities":
             st.markdown("<h2 style='color: #1E293B;'>🎯 Pre-Qualified Actionable Opportunities</h2>", unsafe_allow_html=True)
-            st.write("Every tender below is guaranteed actionable with verified corporate budgets attached.")
+            st.write("Every tender below is guaranteed actionable and matched by our AI Semantic Engine.")
             
             if st.session_state.user_profile is None:
                 st.warning("Please complete your 'My Profile' compliance gateway first to unlock pre-qualified tender matching.")
@@ -318,16 +261,43 @@ else:
                 if not all_valid:
                     st.error("🔒 Matching locked: Your compliance documents require valid updates before you can view active tenders.")
                 else:
-                    matched_rfqs = [r for r in st.session_state.rfqs if r['sector'].lower() == profile['sector'].lower()]
+                    # --- FIX: AI SEMANTIC MATCHING ---
+                    profile_emb = model.encode(profile['description'])
+                    matched_rfqs = []
+                    
+                    for rfq in st.session_state.rfqs:
+                        # 1. Hard Rule: SME's B-BBEE must be better or equal to RFQ's max requirement
+                        sme_level = int(profile.get('bbbee', 'Level 4').split(" ")[1])
+                        req_bbbee = int(rfq.get('max_bbbee', '4'))
+                        
+                        if sme_level > req_bbbee:
+                            continue # Skip if SME doesn't meet B-BBEE requirement
+                            
+                        # 2. AI Semantic Match: Compare description to RFQ scope
+                        rfq_text = f"{rfq['title']} - {rfq['scope']}"
+                        rfq_emb = model.encode(rfq_text)
+                        similarity = float(util.cos_sim(profile_emb, rfq_emb)[0][0])
+                        
+                        # 3. Threshold Check (0.3 is a safe bet for sentence-transformers)
+                        if similarity > 0.3:
+                            matched_rfqs.append((rfq, similarity))
+                    
                     if matched_rfqs:
-                        for rfq in matched_rfqs:
+                        # Sort by highest similarity score
+                        matched_rfqs.sort(key=lambda x: x[1], reverse=True)
+                        
+                        for rfq, score in matched_rfqs:
                             st.markdown(f"""
                                 <div class="css-card" style="border-left: 4px solid #10B981;">
-                                    <h3 style="color: #0F4C81; margin-top: 0;">⭐ {rfq['title']}</h3>
+                                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                                        <h3 style="color: #0F4C81; margin-top: 0;">⭐ {rfq['title']}</h3>
+                                        <span style="background: #EFF6FF; color: #1D4ED8; padding: 4px 8px; border-radius: 6px; font-size: 0.8em; font-weight: bold;">AI Match Score: {score:.2f}</span>
+                                    </div>
                                     <p style="color: #64748B; margin-bottom: 8px;"><b>Scope:</b> {rfq['scope']}</p>
                                     <div style="background: #F8FAFC; padding: 12px; border-radius: 6px; margin-top: 10px;">
                                         <b>Actionability Guarantee:</b><br>
                                         • Confirmed Budget: <b>{rfq['budget']}</b><br>
+                                        • PO / Cost Centre Ref: <b>{rfq['po_ref']}</b><br>
                                         • Region Verified: {rfq['region']}<br>
                                         • Your Match Status: <span style="color: #059669; font-weight: bold;">Pre-Qualified & Ready to Submit</span>
                                     </div>
@@ -357,23 +327,20 @@ else:
                     req_bbbee = c2.selectbox("Max B-BBEE Level Required", ["1", "2", "3", "4"])
                     budget = c3.text_input("Allocated Budget (ZAR)", placeholder="e.g. R350,000")
                     
+                    po_ref = st.text_input("Internal Cost Centre / PO Reference Code (Mandatory Actionability Check)")
                     req_verified = st.checkbox("Enforce 100% Compliance Gate (Only show verified suppliers)", value=True)
                     
                     submitted = st.form_submit_button("Publish & Run Qualification Match")
                     
                     if submitted:
-                        if not budget.strip():
-                            st.error("Actionability Check Failed: A valid budget is required to publish an opportunity.")
+                        if not budget.strip() or not po_ref.strip():
+                            st.error("Actionability Check Failed: A confirmed budget and internal PO reference code are mandatory to publish.")
                         else:
                             new_rfq = {
                                 "id": len(st.session_state.rfqs) + 1,
-                                "title": rfq_title,
-                                "sector": "Renewable Energy" if "solar" in rfq_title.lower() else "ICT",
-                                "scope": rfq_scope,
-                                "budget": budget,
-                                "region": req_region,
-                                "max_bbbee": req_bbbee,
-                                "verified_only": req_verified
+                                "title": rfq_title, "sector": "General", "scope": rfq_scope, 
+                                "budget": budget, "region": req_region, "max_bbbee": req_bbbee, 
+                                "po_ref": po_ref, "verified_only": req_verified
                             }
                             st.session_state.rfqs.append(new_rfq)
                             
@@ -381,10 +348,19 @@ else:
                             st.info("The automated rule engine has screened the registry. Only fully compliant suppliers are displayed below.")
                             
                             for sme in st.session_state.verified_smes:
+                                # Rule 1: Verified Check
                                 if req_verified and not sme["verified"]: 
                                     continue
+                                
+                                # Rule 2: Region Check
                                 if sme["location"] != req_region: 
                                     continue
+                                
+                                # --- FIX: B-BBEE HARD FILTER ---
+                                sme_level = int(sme.get('bbbee', 'Level 4').split(" ")[1])
+                                req_level = int(req_bbbee)
+                                if sme_level > req_level:
+                                    continue # Skip if SME's level is worse (numerically higher) than required
                                 
                                 st.markdown(f"""
                                     <div class="css-card" style="padding: 16px; border-left: 4px solid #10B981;">

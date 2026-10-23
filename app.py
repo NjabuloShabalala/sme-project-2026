@@ -117,41 +117,26 @@ SA_PROVINCES = [
 # 2. HELPER FUNCTIONS & AI ENGINE
 
 def get_sector_from_description(description):
-    """Accurately classifies business capabilities using explicit taxonomy prompting."""
+    """Dynamically detects any and every sector from a business description without rigid taxonomy constraints."""
     if not description or not description.strip():
         return "General Services"
     
     prompt = f"""
-    Analyze the following South African business description and assign it to EXACTLY ONE primary procurement category from this standard list:
-    - Renewable Energy & Solar Services
-    - ICT & Software Development
-    - Electrical & Infrastructure Engineering
-    - Facilities Management & Cleaning
-    - Logistics & Transportation
-    - Professional Services & Consulting
-    - General Construction & Civil Works
+    Analyze the following South African business description and determine its exact industry sector or vertical in 2 to 4 words max (e.g., 'Precision Agriculture & IoT', 'Renewable Energy Engineering', 'Fintech & Payments', 'Mining Logistics').
     
     Description: "{description}"
     
-    Respond with ONLY the exact category name selected from the list above. Do NOT include punctuation or explanation.
+    Respond with ONLY the professional sector name. Do NOT include punctuation, quotation marks, or explanations.
     """
     try:
         res = client.messages.create(
             model="claude-3-haiku-20240307", 
-            max_tokens=30, 
+            max_tokens=25, 
             messages=[{"role": "user", "content": prompt}]
         )
-        category = res.content[0].text.strip()
-        return category
+        sector = res.content[0].text.strip().title()
+        return sector
     except Exception as e:
-        # Intelligent fallback mapping based on keyword heuristics
-        d_lower = description.lower()
-        if "solar" in d_lower or "photovoltaic" in d_lower or "pv" in d_lower or "clean energy" in d_lower:
-            return "Renewable Energy & Solar Services"
-        elif "web" in d_lower or "software" in d_lower or "it" in d_lower or "cloud" in d_lower or "ux" in d_lower:
-            return "ICT & Software Development"
-        elif "electrical" in d_lower or "wiring" in d_lower:
-            return "Electrical & Infrastructure Engineering"
         return "General Services"
 
 def parse_document_dates_with_ai(file_text_simulated):

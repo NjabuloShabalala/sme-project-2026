@@ -221,8 +221,7 @@ def _file_block(data, media_type):
 _vf_ai_on = client is not None
 _vf_role = {"SME": "SME vendor session", "Corporate": "Corporate buyer session"}.get(st.session_state.get("portal_role"), "Signed out")
 st.markdown(f"""<div class="vf-term"><div><span class="vf-brand">VULAFLOW</span><span class="vf-sep">|</span>Enterprise Procurement Terminal</div>
-    <div><span>{_vf_role}</span><span class="vf-sep">|</span><span>{datetime.now():%d %b %Y %H:%M}</span><span class="vf-sep">|</span>
-    <span class="{'vf-live-on' if _vf_ai_on else 'vf-live-off'}">AI {'LIVE' if _vf_ai_on else 'RULES ONLY'}</span></div></div>""", unsafe_allow_html=True)
+    <div><span>{_vf_role}</span><span class="vf-sep">|</span><span>{datetime.now():%d %b %Y %H:%M}</span></div></div>""", unsafe_allow_html=True)
 
 esc = html.escape
 
@@ -998,20 +997,7 @@ if not st.session_state.logged_in:
 else:
     role = st.session_state.portal_role
     st.sidebar.markdown("<h3 style='color: #0F4C81; margin-bottom: 0;'>VulaFlow</h3>", unsafe_allow_html=True)
-    st.sidebar.caption(f"Active role: {role}")
-    if client:
-        st.sidebar.caption(f"AI: on ({MODEL})")
-    else:
-        st.sidebar.warning(f"AI is off: {ai_problem() or st.session_state.get('ai_last_error')}")
-    if st.sidebar.button("Test AI connection"):
-        _t = ask_claude("Reply with the single word: ok", max_tokens=10)
-        if _t:
-            st.sidebar.success(f"Claude replied: {_t}")
-        else:
-            st.sidebar.error(st.session_state.get("ai_last_error") or "No reply")
-    elif client and st.session_state.get("ai_last_error"):
-        st.sidebar.caption("Last AI error: " + st.session_state["ai_last_error"])
-    st.sidebar.caption(f"Python: {sys.executable}")
+    st.sidebar.caption("Corporate Portal" if role == "Corporate" else "SME Portal")
     st.sidebar.markdown("---")
     if role == "SME":
         menu = st.sidebar.radio("Navigation", ["My Profile", "Opportunities & Proposals", "Log Out"])
@@ -1030,18 +1016,11 @@ else:
     if role == "SME":
         if menu == "My Profile":
             if st.session_state.user_profile is None:
-                a, b = st.columns([3, 1])
-                with a:
-                    st.markdown("<h2 style='color: #1E293B;'>Create Your SME Vendor Profile</h2>", unsafe_allow_html=True)
-                    st.caption("Upload documents, confirm the extracted details, and see which tenders you qualify for.")
-                with b:
-                    st.markdown("<br>", unsafe_allow_html=True)
-                    if st.button("⚡ Load Demo Profile"):
-                        st.session_state.user_profile = next(s for s in st.session_state.registry if s["name"].startswith("Sizwe"))
-                        st.rerun()
+                st.markdown("<h2 style='color: #1E293B;'>Create Your SME Vendor Profile</h2>", unsafe_allow_html=True)
+                st.caption("Upload documents, confirm the extracted details, and see which tenders you qualify for.")
 
                 st.markdown("<div class='css-card'>", unsafe_allow_html=True)
-                st.markdown("#### 📄 Document Upload (demo extraction)")
+                st.markdown("#### 📄 Document Upload")
                 st.caption("Upload your CIPC, tax and B-BBEE documents (PDF, PNG, JPG or TXT). Claude reads them, including scans. "
                            "Every extracted field must be confirmed by you below.")
                 up_files = st.file_uploader("Drop CIPC / Tax / B-BBEE documents (select several at once if you like)",

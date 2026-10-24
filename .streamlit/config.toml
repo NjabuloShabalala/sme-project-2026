@@ -1,6 +1,7 @@
 [theme]
-primaryColor = "#2563EB"              # Vibrant Cobalt Blue
-backgroundColor = "#FAFAFA"           # Clean Neutral Canvas
-secondaryBackgroundColor = "#EFF6FF"  # Soft Electric Tint
-textColor = "#0F172A"                 # Slate High-Contrast Text
+base = "dark"
+primaryColor = "#4C9AFF"
+backgroundColor = "#0A0D12"
+secondaryBackgroundColor = "#10151C"
+textColor = "#E8EEF5"
 font = "sans serif"
